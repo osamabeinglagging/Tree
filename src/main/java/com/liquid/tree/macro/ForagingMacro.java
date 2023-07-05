@@ -35,26 +35,24 @@ public class ForagingMacro {
         BONEMEAL,
         TREECAP,
         ROD,
-        SWITCHING,
         NONE
     }
 
     @SubscribeEvent
-    void onTick(TickEvent.ClientTickEvent event){
+    void onTick(TickEvent.RenderTickEvent event){
         if(mc.theWorld==null || mc.thePlayer==null)return;;
         if(!macroOn) return;
         if(AngleUtils.rotating) return;
         if(delay>0) delay--;
+//        log("inTick");
         if(!findItems()){
             log("expected items not in hotbar");
             stop();
             return;
         }
-
         for(BlockPos block: blocks){
             if(!TM.allowedDirtTypes.contains(mc.theWorld.getBlockState(block).getBlock()) && !EventHandler.blocks.contains(block)){
                 EventHandler.blocks.add(block);
-                System.out.println("HERE");
             }
         }
         if(EventHandler.blocks.size()>0){
@@ -62,93 +60,93 @@ public class ForagingMacro {
             log("stoppign macro because not all blocks are ok");
             stop();
         }
-            switch (currentState) {
-                case START:
-                    for (BlockPos block : blocks) {
-                        if (mc.theWorld.getBlockState(block.up()).getBlock() instanceof BlockLog) {
-                            log("log found");
-                            double yaw = AngleUtils.get360Yaw((float) AngleUtils.getYawToBlock(block.up()));
-                            double pitch = AngleUtils.getPitchToBlock(block.up());
-                            if(!((Math.abs(AngleUtils.get360Yaw(mc.thePlayer.rotationYaw) - yaw)) < 0.2 && Math.abs(mc.thePlayer.rotationPitch - pitch) < 0.2 && delay <= 0)){
-                                KBUtils.leftClick(false);
-                                log("looking at log");
-                                AngleUtils.lookAtBlock(block.up(), 150);
-                            } else {
-                                log("breakinge etra blocks");
-                                hold(axe);
-                                KBUtils.leftClick(true);
-                            }
-                            buglog=true;
-                            break;
-                        }
-                        else{
-                            buglog=false;
-                        }
-                    }
-                    if(buglog) return;
-                    currentState = State.SAPLING;
-                    break;
-                case SAPLING:
-                    for (BlockPos block : blocks) {
-                        if (!(mc.theWorld.getBlockState(block.up()).getBlock() instanceof BlockSapling) && !(mc.theWorld.getBlockState(block.up()).getBlock() instanceof BlockLog)) {
+        switch (currentState) {
+            case START:
+                for (BlockPos block : blocks) {
+                    if (mc.theWorld.getBlockState(block.up()).getBlock() instanceof BlockLog) {
+                        log("log found");
+                        double yaw = AngleUtils.get360Yaw((float) AngleUtils.getYawToBlock(block.up()));
+                        double pitch = AngleUtils.getPitchToBlock(block.up());
+                        if(!((Math.abs(AngleUtils.get360Yaw(mc.thePlayer.rotationYaw) - yaw)) < 0.2 && Math.abs(mc.thePlayer.rotationPitch - pitch) < 0.2 && delay <= 0)){
                             KBUtils.leftClick(false);
-                            log("sapling time");
-                            hold(sapling);
-                            double yaw = AngleUtils.get360Yaw((float) AngleUtils.getYawToBlock(block.up()));
-                            double pitch = AngleUtils.getPitchToBlock(block.up());
-                            AngleUtils.lookAtBlock(block.up(), 150);
-                            if((Math.abs(AngleUtils.get360Yaw(mc.thePlayer.rotationYaw) - yaw)) < 0.2 && Math.abs(mc.thePlayer.rotationPitch - pitch) < 0.2 && delay <= 0) {
-                                log("clicking");
-                                KBUtils.rightClick();
-                            }
-                            break;
+                            log("looking at log");
+                            AngleUtils.lookAtBlock(block.up(), 250);
+                        } else {
+                            log("breakinge etra blocks");
+                            hold(axe);
+                            KBUtils.leftClick(true);
                         }
+                        buglog=true;
+                        break;
                     }
-                    if (blocksWithoutSapling() == blocks.size()) {
-                        log("saplings placed.");
-                        currentState = State.BONEMEAL;
+                    else{
+                        buglog=false;
                     }
-                    break;
-                case BONEMEAL:
-                    hold(bonemeal);
-                    BlockPos targetBlock = blocks.get(blocks.size() - 1);
-                    if (mc.theWorld.getBlockState(targetBlock.up()).getBlock() instanceof BlockLog) {
-                        log("tree grown");
-                        currentState = State.TREECAP;
-                    } else if (delay <= 0) {
-                        KBUtils.rightClick();
-                        delay = 10;
-                        System.out.println(delay);
-                    } else {
-                        AngleUtils.lookAtBlock(targetBlock.up(), 150);
-                    }
-                    break;
-                case TREECAP:
-                    hold(axe);
-                    BlockPos targetLogBlock = blocks.get(blocks.size() - 1).up();
-                    if (!RaytraceUtils.getTargetedBlock(4).equals(targetLogBlock)) {
-                        AngleUtils.lookAtBlock(targetLogBlock, 150);
-                    } else if (mc.theWorld.getBlockState(targetLogBlock).getBlock() instanceof BlockLog) {
-                        KBUtils.leftClick(true);
-                        delay = 20;
-                    }
-                    if (!(mc.theWorld.getBlockState(targetLogBlock).getBlock() instanceof BlockLog)) {
+                }
+                if(buglog) return;
+                currentState = State.SAPLING;
+                break;
+            case SAPLING:
+                for (BlockPos block : blocks) {
+                    if (!(mc.theWorld.getBlockState(block.up()).getBlock() instanceof BlockSapling) && !(mc.theWorld.getBlockState(block.up()).getBlock() instanceof BlockLog)) {
                         KBUtils.leftClick(false);
+                        log("sapling time");
+                        hold(sapling);
+                        double yaw = AngleUtils.get360Yaw((float) AngleUtils.getYawToBlock(block.up()));
+                        double pitch = AngleUtils.getPitchToBlock(block.up());
+                        AngleUtils.lookAtBlock(block.up(), 250);
+                        if((Math.abs(AngleUtils.get360Yaw(mc.thePlayer.rotationYaw) - yaw)) < 0.2 && Math.abs(mc.thePlayer.rotationPitch - pitch) < 0.2 && delay <= 0) {
+                            log("clicking");
+                            KBUtils.rightClick();
+                        }
+                        break;
                     }
-                    if (delay <= 0) {
-                        log("breaking ended");
-                        if (monke) currentState = State.ROD;
-                        else currentState = State.SAPLING;
-                        delay = 20;
-                    }
-                    break;
-                case ROD:
-                    hold(rod);
+                }
+                if (blocksWithoutSapling() == blocks.size()) {
+                    log("saplings placed.");
+                    currentState = State.BONEMEAL;
+                }
+                break;
+            case BONEMEAL:
+                hold(bonemeal);
+                BlockPos targetBlock = blocks.get(blocks.size() - 1);
+                if (mc.theWorld.getBlockState(targetBlock.up()).getBlock() instanceof BlockLog) {
+                    log("tree grown");
+                    currentState = State.TREECAP;
+                } else if (delay <= 0) {
                     KBUtils.rightClick();
-                    currentState = State.START;
-                    break;
-            }
+                    delay = 40;
+                    System.out.println(delay);
+                } else {
+                    AngleUtils.lookAtBlock(targetBlock.up(), 250);
+                }
+                break;
+            case TREECAP:
+                hold(axe);
+                BlockPos targetLogBlock = blocks.get(blocks.size() - 1).up();
+                if (!RaytraceUtils.getTargetedBlock(4).equals(targetLogBlock)) {
+                    AngleUtils.lookAtBlock(targetLogBlock, 250);
+                } else if (mc.theWorld.getBlockState(targetLogBlock).getBlock() instanceof BlockLog) {
+                    KBUtils.leftClick(true);
+                    delay = 40;
+                }
+                if (!(mc.theWorld.getBlockState(targetLogBlock).getBlock() instanceof BlockLog)) {
+                    KBUtils.leftClick(false);
+                }
+                if (delay <= 0) {
+                    log("breaking ended");
+                    if (monke) currentState = State.ROD;
+                    else currentState = State.SAPLING;
+                    delay = 40;
+                }
+                break;
+            case ROD:
+                hold(rod);
+                KBUtils.rightClick();
+                currentState = State.START;
+                break;
         }
+    }
 
     public static List<BlockPos> getExpectedBlocks(){
         List<BlockPos> blocks = new ArrayList<BlockPos>();
@@ -180,6 +178,8 @@ public class ForagingMacro {
         macroOn = false;
         blocks.clear();
         EventHandler.blocks.clear();
+        buglog=false;
+        delay=0;
         currentState = State.NONE;
     }
 
