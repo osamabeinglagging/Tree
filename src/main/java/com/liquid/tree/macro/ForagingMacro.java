@@ -1,13 +1,12 @@
 package com.liquid.tree.macro;
 
+import com.liquid.tree.classes.Clock;
 import com.liquid.tree.handler.EventHandler;
 import com.liquid.tree.utils.*;
 import net.minecraft.block.BlockLog;
 import net.minecraft.block.BlockSapling;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.util.BlockPos;
-import net.minecraft.world.World;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import static com.liquid.tree.utils.LogUtils.log;
@@ -25,9 +24,12 @@ public class ForagingMacro {
     static int bonemeal;
     static int axe;
     static int rod;
-    static int delay = 0;
+//    static int delay = 0;
+    static Clock delay = new Clock();
 
     static boolean buglog = false;
+    static int lookDelay =  150;
+    static long start;
 
     public enum State{
         START,
@@ -40,11 +42,12 @@ public class ForagingMacro {
 
     @SubscribeEvent
     void onTick(TickEvent.RenderTickEvent event){
+        // Formula for monke pet; delay = 2000*(petlvl/100) - 550 - Same delay in buglog
         if(mc.theWorld==null || mc.thePlayer==null)return;;
+//        log("RenderTickEvent.");
         if(!macroOn) return;
         if(AngleUtils.rotating) return;
-        if(delay>0) delay--;
-//        log("inTick");
+        if(!delay.getState()) return;
         if(!findItems()){
             log("expected items not in hotbar");
             stop();
@@ -67,10 +70,10 @@ public class ForagingMacro {
                         log("log found");
                         double yaw = AngleUtils.get360Yaw((float) AngleUtils.getYawToBlock(block.up()));
                         double pitch = AngleUtils.getPitchToBlock(block.up());
-                        if(!((Math.abs(AngleUtils.get360Yaw(mc.thePlayer.rotationYaw) - yaw)) < 0.2 && Math.abs(mc.thePlayer.rotationPitch - pitch) < 0.2 && delay <= 0)){
+                        if(!((Math.abs(AngleUtils.get360Yaw(mc.thePlayer.rotationYaw) - yaw)) < 0.2 && Math.abs(mc.thePlayer.rotationPitch - pitch) < 0.2 && delay.getState())){
                             KBUtils.leftClick(false);
                             log("looking at log");
-                            AngleUtils.lookAtBlock(block.up(), 250);
+                            AngleUtils.lookAtBlock(block.up(), lookDelay);
                         } else {
                             log("breakinge etra blocks");
                             hold(axe);
@@ -79,23 +82,26 @@ public class ForagingMacro {
                         buglog=true;
                         break;
                     }
-                    else{
+                    else if(blocks.indexOf(block)==blocks.size()-1 && buglog){
+                        KBUtils.leftClick(false);
                         buglog=false;
+                        delay.start(1300);
                     }
                 }
-                if(buglog) return;
+                if(buglog) break;
                 currentState = State.SAPLING;
                 break;
             case SAPLING:
+                start = System.currentTimeMillis();
                 for (BlockPos block : blocks) {
                     if (!(mc.theWorld.getBlockState(block.up()).getBlock() instanceof BlockSapling) && !(mc.theWorld.getBlockState(block.up()).getBlock() instanceof BlockLog)) {
                         KBUtils.leftClick(false);
-                        log("sapling time");
+//                        log("sapling time");
                         hold(sapling);
                         double yaw = AngleUtils.get360Yaw((float) AngleUtils.getYawToBlock(block.up()));
                         double pitch = AngleUtils.getPitchToBlock(block.up());
-                        AngleUtils.lookAtBlock(block.up(), 250);
-                        if((Math.abs(AngleUtils.get360Yaw(mc.thePlayer.rotationYaw) - yaw)) < 0.2 && Math.abs(mc.thePlayer.rotationPitch - pitch) < 0.2 && delay <= 0) {
+                        AngleUtils.lookAtBlock(block.up(), lookDelay);
+                        if((Math.abs(AngleUtils.get360Yaw(mc.thePlayer.rotationYaw) - yaw)) < 0.2 && Math.abs(mc.thePlayer.rotationPitch - pitch) < 0.2 && delay.getState()) {
                             log("clicking");
                             KBUtils.rightClick();
                         }
@@ -113,31 +119,34 @@ public class ForagingMacro {
                 if (mc.theWorld.getBlockState(targetBlock.up()).getBlock() instanceof BlockLog) {
                     log("tree grown");
                     currentState = State.TREECAP;
-                } else if (delay <= 0) {
+                } else if (delay.getState()) {
                     KBUtils.rightClick();
-                    delay = 40;
-                    System.out.println(delay);
+                    delay.start(500);
                 } else {
-                    AngleUtils.lookAtBlock(targetBlock.up(), 250);
+                    AngleUtils.lookAtBlock(targetBlock.up(), lookDelay);
                 }
                 break;
             case TREECAP:
                 hold(axe);
                 BlockPos targetLogBlock = blocks.get(blocks.size() - 1).up();
                 if (!RaytraceUtils.getTargetedBlock(4).equals(targetLogBlock)) {
-                    AngleUtils.lookAtBlock(targetLogBlock, 250);
-                } else if (mc.theWorld.getBlockState(targetLogBlock).getBlock() instanceof BlockLog) {
+                    AngleUtils.lookAtBlock(targetLogBlock, lookDelay);
+                }
+                else if (mc.theWorld.getBlockState(targetLogBlock).getBlock() instanceof BlockLog) {
                     KBUtils.leftClick(true);
-                    delay = 40;
+                    log("started breaking");
                 }
-                if (!(mc.theWorld.getBlockState(targetLogBlock).getBlock() instanceof BlockLog)) {
+
+                if (!(mc.theWorld.getBlockState(targetLogBlock).getBlock() instanceof BlockLog) && delay.getState()){
+                    log("time: " + (start-System.currentTimeMillis()));
+                    start=0;
+                    log("log broken");
                     KBUtils.leftClick(false);
-                }
-                if (delay <= 0) {
-                    log("breaking ended");
-                    if (monke) currentState = State.ROD;
+                    AngleUtils.lookAtBlock(blocks.get(0).up(), lookDelay);
+                    if(monke) currentState = State.ROD;
                     else currentState = State.SAPLING;
-                    delay = 40;
+                    delay.start(1300);
+                    log("delay: " + delay.getState());
                 }
                 break;
             case ROD:
@@ -179,7 +188,6 @@ public class ForagingMacro {
         blocks.clear();
         EventHandler.blocks.clear();
         buglog=false;
-        delay=0;
         currentState = State.NONE;
     }
 
